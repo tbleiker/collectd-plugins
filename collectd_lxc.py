@@ -18,7 +18,8 @@ def initialize():
 def dispatch(plugin, plugin_instance, type_instance, type_values, values, hostname):
     data = collectd.Values()
     data.plugin = plugin
-    data.plugin_instance = plugin_instance
+    if plugin_instance is not None:
+        data.plugin_instance = plugin_instance
     data.type = type_values
     data.type_instance = type_instance
     data.values = values
@@ -30,6 +31,17 @@ def reader(input_data=None):
     # get hostname
     hostname = str(socket.getfqdn())
     
+    # total values
+    total_cpuUser = 0
+    total_cpuSys = 0
+    total_memRss = 0
+    total_memCache = 0
+    total_memSwap = 0
+    total_blkioBytesRead = 0
+    total_blkioBytesWrite = 0
+    total_blkioIoRead = 0
+    total_blkioIoWrite = 0
+     
     # iterate over all containers
     for container in lxc.list_containers():
         c = lxc.Container(container)
@@ -46,13 +58,15 @@ def reader(input_data=None):
                 cpuUser = 0
                 cpuSys = 0
             
-            # cpu - user
+            # dispatch values
             dispatch('lxc_cpu', container, 'user', 'cpu', [cpuUser], hostname)
-            # cpu - system
             dispatch('lxc_cpu', container, 'system', 'cpu', [cpuSys], hostname)
-            # cpu - total
             dispatch('lxc_cpu', container, 'total', 'cpu', [cpuUser + cpuSys], hostname)
-                        
+            
+            # sum values up for a total
+            total_cpuUser = total_cpuUser + cpuUser
+            total_cpuSys = total_cpuSys + cpuSys
+            
             ## Memrory
             mem = c.get_cgroup_item('memory.stat')
             try:
@@ -64,12 +78,15 @@ def reader(input_data=None):
                 memCache = 0
                 memSwap = 0
             
-            # memory - rss
+            # dispatch values
             dispatch('lxc_memory', container, 'rss', 'memory', [memRss], hostname)
-            # memory - cache
             dispatch('lxc_memory', container, 'cache', 'memory', [memCache], hostname)
-            # memory - swap
             dispatch('lxc_memory', container, 'swap', 'memory', [memSwap], hostname)
+            
+            # sum values up for a total
+            total_memRss = total_memRss + memRss
+            total_memCache = total_memCache + memCache
+            total_memSwap = total_memSwap + memSwap
             
             
             ## Disk
@@ -86,15 +103,31 @@ def reader(input_data=None):
                 blkioIoRead = 0
                 blkioIoWrite = 0
             
-            # blkio - bytes read
+            # dispatch values
             dispatch('lxc_blkio', container, 'bytes_read', 'total_bytes', [blkioBytesRead], hostname)
-            # blkio - bytes write
             dispatch('lxc_blkio', container, 'bytes_write', 'total_bytes', [blkioBytesWrite], hostname)
-            # blkio - io read
             dispatch('lxc_blkio', container, 'ops_read', 'total_operations', [blkioIoRead], hostname)
-            # blkio - io write
             dispatch('lxc_blkio', container, 'ops_write', 'total_operations', [blkioIoWrite], hostname)
             
+            # sum values up for a total
+            total_blkioBytesRead = total_blkioBytesRead + blkioBytesRead
+            total_blkioBytesWrite = total_blkioBytesWrite + blkioBytesWrite
+            total_blkioIoRead = total_blkioIoRead + blkioIoRead
+            total_blkioIoWrite = total_blkioIoWrite + blkioIoWrite
+
+
+    # dispatch total values
+    dispatch('lxc_total_cpu', None, 'user', 'cpu', [total_cpuUser], hostname)
+    dispatch('lxc_total_cpu', None, 'system', 'cpu', [total_cpuSys], hostname)
+    dispatch('lxc_total_cpu', None, 'total', 'cpu', [total_cpuUser + total_cpuSys], hostname)
+    dispatch('lxc_total_memory', None, 'rss', 'memory', [total_memRss], hostname)
+    dispatch('lxc_total_memory', None, 'cache', 'memory', [total_memCache], hostname)
+    dispatch('lxc_total_memory', None, 'swap', 'memory', [total_memSwap], hostname)
+    dispatch('lxc_total_blkio', None, 'bytes_read', 'total_bytes', [total_blkioBytesRead], hostname)
+    dispatch('lxc_total_blkio', None, 'bytes_write', 'total_bytes', [total_blkioBytesWrite], hostname)
+    dispatch('lxc_total_blkio', None, 'ops_read', 'total_operations', [total_blkioIoRead], hostname)
+    dispatch('lxc_total_blkio', None, 'ops_write', 'total_operations', [total_blkioIoWrite], hostname)
+
 
 collectd.register_config(configure)
 collectd.register_init(initialize)
