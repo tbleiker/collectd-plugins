@@ -15,6 +15,17 @@ def initialize():
     collectd.debug('Initializing lxc collectd.')
 
 
+def dispatch(plugin, plugin_instance, type_instance, type_values, values, hostname):
+    data = collectd.Values()
+    data.plugin = plugin
+    data.plugin_instance = plugin_instance
+    data.type = type_values
+    data.type_instance = type_instance
+    data.values = values
+    data.host = hostname
+    data.dispatch()
+
+
 def reader(input_data=None):
     # get hostname
     hostname = str(socket.getfqdn())
@@ -29,137 +40,60 @@ def reader(input_data=None):
             ## CPU
             cpu = c.get_cgroup_item('cpuacct.stat')
             try:
-                cpuUserVal = int(re.search('user\s(?P<user>[0-9]+)', cpu).group('user'))
-                cpuSysVal = int(re.search('system\s(?P<sys>[0-9]+)', cpu).group('sys'))
+                cpuUser = int(re.search('user\s(?P<user>[0-9]+)', cpu).group('user'))
+                cpuSys = int(re.search('system\s(?P<sys>[0-9]+)', cpu).group('sys'))
             except AttributeError:
-                cpuUserVal = 0
-                cpuSysVal = 0
+                cpuUser = 0
+                cpuSys = 0
             
             # cpu - user
-            cpuUser = collectd.Values()
-            cpuUser.plugin = "lxc_cpu"
-            cpuUser.plugin_instance = container
-            cpuUser.type_instance = 'user'
-            cpuUser.type = 'cpu'
-            cpuUser.values = [cpuUserVal]
-            cpuUser.host = hostname
-            cpuUser.dispatch()
-            
+            dispatch('lxc_cpu', container, 'user', 'cpu', [cpuUser], hostname)
             # cpu - system
-            cpuSys = collectd.Values()
-            cpuSys.plugin = "lxc_cpu"
-            cpuSys.plugin_instance = container
-            cpuSys.type_instance = 'system'
-            cpuSys.type = 'cpu'
-            cpuSys.values = [cpuSysVal]
-            cpuSys.host = hostname
-            cpuSys.dispatch()
-            
+            dispatch('lxc_cpu', container, 'system', 'cpu', [cpuSys], hostname)
             # cpu - total
-            cpuSys = collectd.Values()
-            cpuSys.plugin = "lxc_cpu"
-            cpuSys.plugin_instance = container
-            cpuSys.type_instance = 'total'
-            cpuSys.type = 'cpu'
-            cpuSys.values = [cpuUserVal + cpuSysVal]
-            cpuSys.host = hostname
-            cpuSys.dispatch()
+            dispatch('lxc_cpu', container, 'total', 'cpu', [cpuUser + cpuSys], hostname)
                         
             ## Memrory
             mem = c.get_cgroup_item('memory.stat')
             try:
-                memRssVal = int(re.search('rss\s(?P<rss>[0-9]+)', mem).group('rss'))
-                memCacheVal = int(re.search('cache\s(?P<cache>[0-9]+)', mem).group('cache'))
-                memSwapVal = int(re.search('swap\s(?P<swap>[0-9]+)', mem).group('swap'))
+                memRss = int(re.search('rss\s(?P<rss>[0-9]+)', mem).group('rss'))
+                memCache = int(re.search('cache\s(?P<cache>[0-9]+)', mem).group('cache'))
+                memSwap = int(re.search('swap\s(?P<swap>[0-9]+)', mem).group('swap'))
             except AttributeError:
-                memRssVal = 0
-                memCacheVal = 0
-                memSwapVal = 0
+                memRss = 0
+                memCache = 0
+                memSwap = 0
             
             # memory - rss
-            memRss = collectd.Values()
-            memRss.plugin = "lxc_memory"
-            memRss.plugin_instance = container
-            memRss.type_instance = 'rss'
-            memRss.type = 'memory'
-            memRss.values = [memRssVal]
-            memRss.host = hostname
-            memRss.dispatch()
-            
+            dispatch('lxc_memory', container, 'rss', 'memory', [memRss], hostname)
             # memory - cache
-            memCache = collectd.Values()
-            memCache.plugin = "lxc_memory"
-            memCache.plugin_instance = container
-            memCache.type_instance = 'cache'
-            memCache.type = 'memory'
-            memCache.values = [memCacheVal]
-            memCache.host = hostname
-            memCache.dispatch()           
-            
+            dispatch('lxc_memory', container, 'cache', 'memory', [memCache], hostname)
             # memory - swap
-            memSwap = collectd.Values()
-            memSwap.plugin = "lxc_memory"
-            memSwap.plugin_instance = container
-            memSwap.type_instance = 'swap'
-            memSwap.type = 'memory'
-            memSwap.values = [memSwapVal]
-            memSwap.host = hostname
-            memSwap.dispatch()
+            dispatch('lxc_memory', container, 'swap', 'memory', [memSwap], hostname)
             
             
             ## Disk
             blkioBytes = c.get_cgroup_item('blkio.throttle.io_service_bytes')
             blkioIo = c.get_cgroup_item('blkio.throttle.io_serviced')
             try:
-                blkioBytesReadVal = int(re.search("Read\s+(?P<read>[0-9]+)", blkioBytes).group('read'))
-                blkioBytesWriteVal = int(re.search("Write\s+(?P<write>[0-9]+)", blkioBytes).group('write'))
-                blkioIoReadVal = int(re.search("Read\s+(?P<read>[0-9]+)", blkioIo).group('read'))
-                blkioIoWriteVal = int(re.search("Write\s+(?P<write>[0-9]+)", blkioIo).group('write'))
+                blkioBytesRead = int(re.search("Read\s+(?P<read>[0-9]+)", blkioBytes).group('read'))
+                blkioBytesWrite = int(re.search("Write\s+(?P<write>[0-9]+)", blkioBytes).group('write'))
+                blkioIoRead = int(re.search("Read\s+(?P<read>[0-9]+)", blkioIo).group('read'))
+                blkioIoWrite = int(re.search("Write\s+(?P<write>[0-9]+)", blkioIo).group('write'))
             except AttributeError:
-                blkioBytesReadVal = 0
-                blkioBytesWriteVal = 0
-                blkioIoReadVal = 0
-                blkioIoWriteVal = 0
+                blkioBytesRead = 0
+                blkioBytesWrite = 0
+                blkioIoRead = 0
+                blkioIoWrite = 0
             
             # blkio - bytes read
-            blkioBytesRead = collectd.Values()
-            blkioBytesRead.plugin = "lxc_blkio"
-            blkioBytesRead.plugin_instance = container
-            blkioBytesRead.type_instance = 'bytes_read'
-            blkioBytesRead.type = 'total_bytes'
-            blkioBytesRead.values = [blkioBytesReadVal]
-            blkioBytesRead.host = hostname
-            blkioBytesRead.dispatch()
-            
+            dispatch('lxc_blkio', container, 'bytes_read', 'total_bytes', [blkioBytesRead], hostname)
             # blkio - bytes write
-            blkioBytesWrite = collectd.Values()
-            blkioBytesWrite.plugin = "lxc_blkio"
-            blkioBytesWrite.plugin_instance = container
-            blkioBytesWrite.type_instance = 'bytes_write'
-            blkioBytesWrite.type = 'total_bytes'
-            blkioBytesWrite.values = [blkioBytesWriteVal]
-            blkioBytesWrite.host = hostname
-            blkioBytesWrite.dispatch()
-            
+            dispatch('lxc_blkio', container, 'bytes_write', 'total_bytes', [blkioBytesWrite], hostname)
             # blkio - io read
-            blkioIoRead = collectd.Values()
-            blkioIoRead.plugin = "lxc_blkio"
-            blkioIoRead.plugin_instance = container
-            blkioIoRead.type_instance = 'ops_read'
-            blkioIoRead.type = 'total_operations'
-            blkioIoRead.values = [blkioIoReadVal]
-            blkioIoRead.host = hostname
-            blkioIoRead.dispatch()
-            
+            dispatch('lxc_blkio', container, 'ops_read', 'total_operations', [blkioIoRead], hostname)
             # blkio - io write
-            blkioIoWrite = collectd.Values()
-            blkioIoWrite.plugin = "lxc_blkio"
-            blkioIoWrite.plugin_instance = container
-            blkioIoWrite.type_instance = 'ops_write'
-            blkioIoWrite.type = 'total_operations'
-            blkioIoWrite.values = [blkioIoWriteVal]
-            blkioIoWrite.host = hostname
-            blkioIoWrite.dispatch()
+            dispatch('lxc_blkio', container, 'ops_write', 'total_operations', [blkioIoWrite], hostname)
             
 
 collectd.register_config(configure)
